@@ -29,7 +29,6 @@
 #include <Mille_UNO.h>
 
 
-
 //SECURE CLASS
 
 Secure::Secure(int pin){
@@ -551,12 +550,11 @@ void WIND::init(){
     }
 }
 
-bool WIND::receive(wind_t* buff){
+void WIND::receive(wind_t* buff){
     bool flag = 0;
     if (available()){
-        flag = read(&buff, sizeof(wind_t));
+        read(&buff, sizeof(wind_t));
     }
-    return flag;
 }
 
 bool WIND::send(wind_t* buff){
@@ -674,20 +672,103 @@ void serialAttitude(float* attitude, boolean i){
     Serial.print(attitude[2]);Serial.print('\n');
 }
 
-boolean serialGPS(float vel, unsigned long gradi, unsigned long date, unsigned long times, long lat, long lon, boolean i){
-    if (i){
-        Serial.print('\n');
-        Serial.print("speed");Serial.print('\t');
-        Serial.print("course");Serial.print('\t');
-        Serial.print("lat");Serial.print('\t');
-        Serial.print("lon");Serial.print('\t');
-        Serial.print("times");Serial.print('\t');
-        Serial.print("date");Serial.print('\n');
+void printMVUPC(struct Mvupc_t mvupc){
+    Serial.print("$MVUPC,");Serial.print(millis());Serial.print(",");
+    Serial.print(mvupc.lat);Serial.print(",N,");
+    Serial.print(mvupc.lon);Serial.print(",E,");Serial.print(mvupc.vel);
+    Serial.print(",K,");Serial.print(mvupc.gradi/100);Serial.print(",C,");
+    Serial.print(mvupc.attitude[2]);Serial.print(",");Serial.print(mvupc.attitude[1]);
+    Serial.print(",");Serial.print(mvupc.attitude[0]);Serial.println(",RPY");
+}
+
+void printMVUP(struct Mvup_t mvup){
+    Serial.print("$MVUP,");Serial.print(millis());Serial.print(",");
+    Serial.print(mvup.lat);Serial.print(",N,");
+    Serial.print(mvup.lon);Serial.print(",E,");Serial.print(mvup.vel);
+    Serial.print(",K,");Serial.print(mvup.gradi/100);Serial.print(",C,");
+    Serial.print(mvup.tempDS);Serial.print(",G,");Serial.print(mvup.attitude[2]);
+    Serial.print(",");Serial.print(mvup.attitude[1]);
+    Serial.print(",");Serial.print(mvup.attitude[0]);Serial.print(",RPY,");
+    Serial.print(mvup.Wspeed);Serial.print(",WS,");Serial.print(mvup.vale_1);
+    Serial.print(",");Serial.print(mvup.vale_2);Serial.print(",WD,");
+    Serial.print(mvup.left);Serial.print(",");Serial.print(mvup.right);Serial.println(",L");
+}
+
+void printFPVMVUP(struct Mvup_t mvup, byte mil){
+    Serial.print("$MVUP,");Serial.print(millis());Serial.print(",");
+    Serial.print(mvup.lat);Serial.print(",N,");
+    Serial.print(mvup.lon);Serial.print(",E,");Serial.print(mvup.vel);
+    Serial.print(",K,");Serial.print(mvup.gradi/100);Serial.print(",C,");
+    Serial.print(mvup.tempDS);Serial.print(",G");
+    delay(mil);
+    Serial.print(mvup.attitude[2]);
+    Serial.print(",");Serial.print(mvup.attitude[1]);
+    Serial.print(",");Serial.print(mvup.attitude[0]);Serial.print(",RPY,");
+    Serial.print(mvup.Wspeed);Serial.print(",WS,");Serial.print(mvup.vale_1);
+    Serial.print(",");Serial.print(mvup.vale_2);Serial.print(",WD,");
+    Serial.print(mvup.left);Serial.print(",");Serial.print(mvup.right);Serial.println(",L");
+}
+
+void sendCommand(byte type, byte* commands, byte len, byte starter, byte ender){//send command
+    byte _XOR;
+    Serial.write(starter);
+    Serial.write(type);
+    Serial.print(",");
+    for (byte i=0; i<len; ++i){
+        Serial.write(commands[i]);
     }
-    Serial.print(vel);Serial.print('\t');
-    Serial.print(gradi);Serial.print('\t');
-    Serial.print(lat);Serial.print('\t');
-    Serial.print(lon);Serial.print('\t');
-    Serial.print(times);Serial.print('\t');
-    Serial.print(date);Serial.print('\n');
+    Serial.write('*');
+    _XOR = type^getCheckSum(commands, len);
+    Serial.write(_XOR);
+    Serial.write(ender);
+}
+
+byte readCommand(byte *buff, byte lenght){//read command receive on Serial
+    //it will read a known sequence NMEA with lenght datas
+    byte error = 100;
+    byte _xor;
+    if (Serial.available()){
+        if(Serial.read()=='$'){//if it is a starter byte (read next one)
+            delay(2);
+            buff[0] = Serial.read();
+            _xor=_xor^buff[0];
+            for(byte i = 1; i<lenght;++i){
+                delay(2);
+                Serial.read();
+                delay(2);
+                buff[i]=Serial.read();//store datas in buffer
+                //Serial.println(buff[i]);//debug on serial
+                _xor=_xor^buff[i];
+            }
+            delay(2);
+            if(Serial.read()=='*'){//if we have an ender
+                if(_xor==Serial.read()){
+                    error = 0;//ok
+                }
+                else error = 1;//error with checksum
+            }
+            else error = 3;//no ender
+        }
+        else{
+            error = 2;//no starter
+            while(Serial.available()){//clean Serial buffer
+                Serial.read();
+                delay(2);
+            }
+        }
+    }
+    return error;
+}
+
+void sendStruct(byte* commands, byte len, byte starter, byte ender){
+    //to give struct lenght: byte * c = (byte *) &mvic; assuming mvic as the name of struct
+  byte _XOR;
+  Serial.write(starter);
+  for (byte i=0; i<len; ++i){
+    Serial.write(commands[i]);
+  }
+  Serial.write('*');
+  _XOR = getCheckSum(commands, len);
+  Serial.write(_XOR);
+  Serial.write(ender);
 }

@@ -43,7 +43,7 @@
 #define MPU_PWR_MGMT_1  0x6B   //MPU6050 power control register 1
 #define MPU_PWR_MGMT_2  0x6C   //MPU6050 power control register 2
 
-#define HMC5883L_ad         0x1E
+#define HMC5883L_ad    0x1E
 #define HMC_CONF_A     0x00  //HMC5883L config register A
 #define HMC_CONF_B     0x01  //HMC5883L config register B
 #define HMC_MODE       0x02  //HMC5883L mode register
@@ -54,14 +54,19 @@
 
 
 // STRUCTURE DEFINITIONS
-struct Mvupc_t //NMEA: Mille&una Vela UniPd Corta
+struct Mvic_t
+{ //NMEA: Mètis Vela Infusion Check Byte
+  float ext_t, ext_u, inl_t, oul_t, ins_t;
+};
+
+struct Mvupc_t //NMEA: Mètis Vela UniPd Corta
 {
     long lat,lon;
     unsigned long gradi, date, times;
     float vel, attitude[3];
 };
 
-struct Mvup_t //NMEA: &una Vela UniPd
+struct Mvup_t //NMEA: Mètis Vela UniPd
 {
     long lat,lon;
     unsigned long gradi, date, times;
@@ -76,6 +81,27 @@ struct wind_t //Wifi wind datas
     int dir_2;
 };
 
+struct Mvicb_t { //NMEA: Mètis Vela Infusion Check Byte
+  byte tipo;
+  float ext_t, ext_u, inl_t, oul_t, ins_t;
+};
+
+struct Mvupcb_t //NMEA: Mètis Vela UniPd Corta Byte
+{   
+    byte tipo;
+    long lat,lon;
+    unsigned long gradi, date, times;
+    float vel, attitude[3];
+};
+
+struct Mvupb_t //NMEA: Mètis Vela UniPd Byte
+{
+    byte tipo;
+    long lat,lon;
+    unsigned long gradi, date, times;
+    float vel, attitude[3], tempDS, left, right;
+    byte Wspeed, vale_1, vale_2;
+};
 
 
 class Secure{
@@ -229,7 +255,7 @@ class WIND: public RF24
 public:
     WIND(uint8_t ce, uint8_t cs, uint64_t out, uint64_t in); //to open writing and reading pipe
     void init();
-    bool receive(wind_t* buff);
+    void receive(wind_t* buff);
     bool send(wind_t* buff);
     uint64_t getAddress(bool i); //0: OUT, 1 IN
 private:
@@ -258,7 +284,12 @@ void printSerial(char** string, int x);
 void printSerial(int* array, int x);
 void serialRaw(float* acc, float* gyr, float* mag);
 void serialAttitude(float* attitude, boolean i);
-boolean serialGPS(float vel, unsigned long gradi, unsigned long date, unsigned long times, long lat, long lon, boolean i);
+void printMVUP(struct Mvup_t mvup);
+void printFPVMVUP(struct Mvup_t mvup, byte mil);
+void printMVUPC(struct Mvupc_t mvup);
+void sendCommand(byte type, byte* commands, byte len, byte starter, byte ender);
+byte readCommand(byte *buff, byte lenght);
+void sendStruct(byte* commands, byte len, byte starter, byte ender);
 
 
 #endif
