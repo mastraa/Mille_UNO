@@ -277,6 +277,7 @@ private:
 //ALTRE FUNZIONI SENZA CLASSE
 
 uint8_t getCheckSum(char *string);
+uint8_t getCheckSum(byte *buff, int l);
 
 //It will print all components of the array
 //Example calling function: printSerial(prova, sizeof(prova)/sizeof(char*));
